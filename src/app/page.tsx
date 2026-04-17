@@ -9,127 +9,118 @@ import {
 } from "lucide-react";
 
 // ─── AMBIENT MUSIC ENGINE (Web Audio API) ───
-// Generates vibe-matched ambient soundscapes using pure Web Audio — no external files needed
-class AmbientMusicEngine {
-  private ctx: AudioContext | null = null;
-  private gainNode: GainNode | null = null;
-  private oscillators: OscillatorNode[] = [];
-  private isPlaying = false;
-  private vibeId: string = "";
+// Generates vibe-matched ambient soundscapes — no external files needed.
+// Each vibe creates a unique chord pad with slow filter modulation.
+function createMusicEngine() {
+  let ctx: AudioContext | null = null;
+  let masterGain: GainNode | null = null;
+  let nodes: (OscillatorNode | GainNode | BiquadFilterNode)[] = [];
+  let active = false;
+  let currentVibe = "";
 
-  private getCtx(): AudioContext {
-    if (!this.ctx) {
-      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      this.gainNode = this.ctx.createGain();
-      this.gainNode.gain.value = 0;
-      this.gainNode.connect(this.ctx.destination);
+  function ensureCtx() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      masterGain = ctx.createGain();
+      masterGain.gain.value = 0;
+      masterGain.connect(ctx.destination);
     }
-    return this.ctx;
+    if (ctx.state === "suspended") ctx.resume();
+    return ctx;
   }
 
-  private createPad(freq: number, type: OscillatorType, gainVal: number, detuneVal: number = 0) {
-    const ctx = this.getCtx();
-    const osc = ctx.createOscillator();
-    const oscGain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
+  function addPad(freq: number, type: OscillatorType, vol: number, detune: number) {
+    const c = ensureCtx();
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    const filter = c.createBiquadFilter();
+    const lfo = c.createOscillator();
+    const lfoGain = c.createGain();
 
     osc.type = type;
     osc.frequency.value = freq;
-    osc.detune.value = detuneVal;
-
+    osc.detune.value = detune;
     filter.type = "lowpass";
-    filter.frequency.value = 800;
-    filter.Q.value = 1;
+    filter.frequency.value = 600 + Math.random() * 400;
+    filter.Q.value = 0.7;
+    gain.gain.value = vol;
 
-    oscGain.gain.value = gainVal;
-
-    osc.connect(filter);
-    filter.connect(oscGain);
-    oscGain.connect(this.gainNode!);
-    osc.start();
-
-    this.oscillators.push(osc);
-
-    // Slow LFO on filter for movement
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.frequency.value = 0.05 + Math.random() * 0.1;
-    lfoGain.gain.value = 300;
+    // Slow LFO moves the filter cutoff for organic movement
+    lfo.type = "sine";
+    lfo.frequency.value = 0.03 + Math.random() * 0.08;
+    lfoGain.gain.value = 250 + Math.random() * 150;
     lfo.connect(lfoGain);
     lfoGain.connect(filter.frequency);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGain!);
+
+    osc.start();
     lfo.start();
-    this.oscillators.push(lfo);
+
+    nodes.push(osc, gain, filter, lfo, lfoGain);
   }
 
-  play(vibeId: string) {
-    if (this.isPlaying && this.vibeId === vibeId) return;
-    this.stop();
+  const VIBES: Record<string, { notes: number[]; type: OscillatorType }> = {
+    luxury:  { notes: [130.81, 196.00, 261.63, 329.63, 392.00], type: "sine" },
+    modern:  { notes: [110.00, 164.81, 220.00, 329.63, 440.00], type: "triangle" },
+    warm:    { notes: [146.83, 220.00, 293.66, 369.99, 440.00], type: "sine" },
+    coastal: { notes: [174.61, 261.63, 349.23, 440.00, 523.25], type: "sine" },
+    urban:   { notes: [98.00, 146.83, 196.00, 293.66, 392.00], type: "sawtooth" },
+    classic: { notes: [130.81, 164.81, 196.00, 261.63, 329.63], type: "sine" },
+  };
 
-    const ctx = this.getCtx();
-    if (ctx.state === "suspended") ctx.resume();
+  return {
+    play(vibeId: string) {
+      // Already playing this vibe — do nothing
+      if (active && currentVibe === vibeId) return;
 
-    this.vibeId = vibeId;
-    this.isPlaying = true;
+      // Kill existing oscillators immediately
+      nodes.forEach(n => { try { if (n instanceof OscillatorNode) n.stop(); } catch {} });
+      nodes = [];
 
-    // Vibe-specific chord voicings and timbres
-    const vibeConfigs: Record<string, { notes: number[]; type: OscillatorType; filterFreq?: number }> = {
-      luxury:  { notes: [130.81, 196.00, 261.63, 329.63, 392.00], type: "sine" },       // C major spread — warm orchestral
-      modern:  { notes: [110.00, 164.81, 220.00, 329.63, 440.00], type: "triangle" },    // Am9 — cool electronic
-      warm:    { notes: [146.83, 220.00, 293.66, 369.99, 440.00], type: "sine" },         // D major — warm acoustic
-      coastal: { notes: [174.61, 261.63, 349.23, 440.00, 523.25], type: "sine" },         // F major — bright airy
-      urban:   { notes: [98.00, 146.83, 196.00, 293.66, 392.00], type: "sawtooth" },      // G minor — deep moody
-      classic: { notes: [130.81, 164.81, 196.00, 261.63, 329.63], type: "sine" },         // C/E — elegant piano-like
-    };
+      const c = ensureCtx();
+      currentVibe = vibeId;
+      active = true;
 
-    const config = vibeConfigs[vibeId] || vibeConfigs.luxury;
-
-    config.notes.forEach((freq, i) => {
-      this.createPad(freq, config.type, 0.06 - i * 0.008, (Math.random() - 0.5) * 15);
-    });
-
-    // Fade in
-    this.gainNode!.gain.setValueAtTime(0, ctx.currentTime);
-    this.gainNode!.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 2);
-  }
-
-  stop() {
-    if (!this.isPlaying) return;
-    this.isPlaying = false;
-
-    if (this.gainNode && this.ctx) {
-      this.gainNode.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.5);
-    }
-
-    setTimeout(() => {
-      this.oscillators.forEach(osc => {
-        try { osc.stop(); } catch {}
+      const config = VIBES[vibeId] || VIBES.luxury;
+      config.notes.forEach((freq, i) => {
+        addPad(freq, config.type, 0.05 - i * 0.007, (Math.random() - 0.5) * 12);
       });
-      this.oscillators = [];
-    }, 600);
-  }
 
-  setVolume(v: number) {
-    if (this.gainNode && this.ctx) {
-      this.gainNode.gain.linearRampToValueAtTime(v, this.ctx.currentTime + 0.1);
-    }
-  }
+      // Fade in over 1.5s
+      masterGain!.gain.cancelScheduledValues(c.currentTime);
+      masterGain!.gain.setValueAtTime(masterGain!.gain.value, c.currentTime);
+      masterGain!.gain.linearRampToValueAtTime(0.4, c.currentTime + 1.5);
+    },
 
-  get playing() { return this.isPlaying; }
+    stop() {
+      if (!active || !ctx || !masterGain) return;
+      active = false;
+      currentVibe = "";
 
-  dispose() {
-    this.stop();
-    if (this.ctx) {
-      this.ctx.close();
-      this.ctx = null;
-    }
-  }
+      // Fade out, then kill oscillators
+      masterGain.gain.cancelScheduledValues(ctx.currentTime);
+      masterGain.gain.setValueAtTime(masterGain.gain.value, ctx.currentTime);
+      masterGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
+
+      const oldNodes = [...nodes];
+      nodes = [];
+      setTimeout(() => {
+        oldNodes.forEach(n => { try { if (n instanceof OscillatorNode) n.stop(); } catch {} });
+      }, 500);
+    },
+
+    get playing() { return active; },
+  };
 }
 
-// Singleton music engine
-let musicEngine: AmbientMusicEngine | null = null;
-function getMusicEngine(): AmbientMusicEngine {
-  if (!musicEngine) musicEngine = new AmbientMusicEngine();
-  return musicEngine;
+// Singleton — created on first use in the browser
+let _engine: ReturnType<typeof createMusicEngine> | null = null;
+function getMusicEngine() {
+  if (!_engine && typeof window !== "undefined") _engine = createMusicEngine();
+  return _engine;
 }
 
 // ─── COMPASS LOGO SVG (from compass.com) ───
@@ -681,16 +672,21 @@ function PreviewStep({ images, vibe, onNext, onBack }: {
   const totalDuration = images.length * clipDuration;
   const [transitionClass, setTransitionClass] = useState("");
 
-  // Music engine integration
+  // Music: start/stop based on play state and mute
   useEffect(() => {
     const engine = getMusicEngine();
+    if (!engine) return;
     if (playing && !muted) {
       engine.play(vibe.id);
     } else {
       engine.stop();
     }
-    return () => { engine.stop(); };
   }, [playing, muted, vibe.id]);
+
+  // Stop music when leaving this step
+  useEffect(() => {
+    return () => { getMusicEngine()?.stop(); };
+  }, []);
 
   const toggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
