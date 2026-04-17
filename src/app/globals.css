@@ -23,29 +23,59 @@ body {
 ::-webkit-scrollbar-track { background: var(--compass-gray-50); }
 ::-webkit-scrollbar-thumb { background: var(--compass-gray-200); border-radius: 3px; }
 
+/* ─── Ken Burns parallax animations ─── */
 @keyframes slowZoomPan {
-  0% { transform: scale(1) translate(0, 0); }
-  50% { transform: scale(1.15) translate(-2%, -1%); }
-  100% { transform: scale(1.08) translate(1%, -2%); }
+  0% { transform: scale(1.02) translate(0, 0); }
+  100% { transform: scale(1.18) translate(-2%, -1.5%); }
 }
 @keyframes slowPanRight {
-  0% { transform: scale(1.1) translate(-3%, 0); }
-  100% { transform: scale(1.1) translate(3%, -1%); }
+  0% { transform: scale(1.12) translate(-3%, 0); }
+  100% { transform: scale(1.12) translate(3%, -1%); }
 }
 @keyframes slowPanUp {
-  0% { transform: scale(1.12) translate(0, 2%); }
-  100% { transform: scale(1.12) translate(-1%, -3%); }
+  0% { transform: scale(1.14) translate(0, 2%); }
+  100% { transform: scale(1.14) translate(-1.5%, -3%); }
 }
 @keyframes slowPullBack {
-  0% { transform: scale(1.2) translate(1%, 1%); }
-  100% { transform: scale(1.0) translate(0, 0); }
+  0% { transform: scale(1.22) translate(1%, 1%); }
+  100% { transform: scale(1.02) translate(0, 0); }
 }
 
-.parallax-0 { animation: slowZoomPan 8s ease-in-out infinite alternate; }
-.parallax-1 { animation: slowPanRight 7s ease-in-out infinite alternate; }
-.parallax-2 { animation: slowPanUp 9s ease-in-out infinite alternate; }
-.parallax-3 { animation: slowPullBack 10s ease-in-out infinite alternate; }
+.parallax-0 { animation: slowZoomPan 5s ease-in-out infinite alternate; }
+.parallax-1 { animation: slowPanRight 5s ease-in-out infinite alternate; }
+.parallax-2 { animation: slowPanUp 5s ease-in-out infinite alternate; }
+.parallax-3 { animation: slowPullBack 5s ease-in-out infinite alternate; }
 
+/* ─── Crossfade transitions ─── */
+.crossfade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+.crossfade-out {
+  animation: fadeOut 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* ─── Staggered load animation ─── */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Processing animations ─── */
 @keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 20px rgba(0,100,229,0.1); }
   50% { box-shadow: 0 0 40px rgba(0,100,229,0.25); }
@@ -62,3 +92,48 @@ body {
   animation: shimmer 2s ease-in-out infinite;
 }
 
+@keyframes shimmer-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+.shimmer-bar {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: shimmer-bar 1.5s ease-in-out infinite;
+}
+
+/* ─── Scan line for processing preview ─── */
+@keyframes scanLine {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,100,229,0.8), transparent);
+  box-shadow: 0 0 12px rgba(0,100,229,0.5);
+  animation: scanLine 2s ease-in-out infinite;
+}
+
+/* ─── Music bars ─── */
+@keyframes musicBar {
+  0%, 100% { height: 4px; }
+  50% { height: 12px; }
+}
+.music-bar {
+  animation: musicBar 0.8s ease-in-out infinite;
+}
+
+/* ─── Vignette overlay for video ─── */
+.vignette-overlay {
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.3) 100%);
+}
+
+/* ─── Timeline clip hover ─── */
+.timeline-clip {
+  transition: all 0.2s ease;
+}
+.timeline-clip:hover {
+  transform: scale(1.05);
+}

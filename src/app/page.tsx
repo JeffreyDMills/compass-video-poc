@@ -2,9 +2,10 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import {
-  Upload, Sparkles, Play, Share2, CheckCircle, AlertTriangle,
+  Upload, Sparkles, Play, Pause, Share2, CheckCircle, AlertTriangle,
   ChevronRight, Music, RotateCcw, Type, Image as ImageIcon,
-  Download, ExternalLink, X, Camera, Star, Zap, Clock
+  Download, ExternalLink, X, Camera, Star, Zap, Clock, Copy, Code,
+  ArrowRight, Eye
 } from "lucide-react";
 
 // ─── COMPASS LOGO SVG (from compass.com) ───
@@ -18,14 +19,12 @@ function CompassLogo({ className = "", color = "currentColor" }: { className?: s
 }
 
 // ─── TYPES ───
-interface UploadedImage {
+interface ListingPhoto {
   id: string;
-  file: File;
   url: string;
-  name: string;
   room: string;
   quality: number;
-  status: "good" | "warning" | "bad";
+  status: "good" | "warning";
 }
 
 interface Vibe {
@@ -35,31 +34,93 @@ interface Vibe {
   description: string;
   color: string;
   musicLabel: string;
+  thumbnail: string;
 }
+
+// ─── LISTING DATA (realistic Compass listing) ───
+const LISTING = {
+  address: "1247 Coast Village Road",
+  city: "Montecito",
+  state: "CA",
+  zip: "93108",
+  price: "$4,895,000",
+  beds: 5,
+  baths: 4,
+  sqft: "4,280",
+  lot: "0.42 acres",
+  yearBuilt: 2019,
+  mls: "24-3847",
+  type: "Single Family",
+  description: "An exquisite Mediterranean estate nestled in the hills of Montecito with sweeping ocean views, resort-style pool, and chef's kitchen with La Cornue range.",
+};
+
+// ─── AGENT DATA (realistic Compass agent profile) ───
+const AGENT = {
+  name: "Victoria Chen",
+  title: "Licensed Associate Real Estate Broker",
+  team: "The Chen Group",
+  phone: "(805) 555-0142",
+  email: "victoria.chen@compass.com",
+  photo: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&q=80",
+  license: "DRE #02087541",
+  office: "Compass · Montecito",
+  transactions: "127 transactions",
+  volume: "$284M career volume",
+};
+
+// ─── PRE-LOADED LISTING PHOTOS (Unsplash - free to use) ───
+const DEMO_PHOTOS: ListingPhoto[] = [
+  { id: "p1", url: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80", room: "Front Exterior", quality: 9.4, status: "good" },
+  { id: "p2", url: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80", room: "Living Room", quality: 9.1, status: "good" },
+  { id: "p3", url: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=800&q=80", room: "Kitchen", quality: 8.8, status: "good" },
+  { id: "p4", url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80", room: "Dining Room", quality: 9.2, status: "good" },
+  { id: "p5", url: "https://images.unsplash.com/photo-1616594039964-ae9021a400a0?w=800&q=80", room: "Primary Bedroom", quality: 8.5, status: "good" },
+  { id: "p6", url: "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800&q=80", room: "Bathroom", quality: 7.9, status: "warning" },
+  { id: "p7", url: "https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=800&q=80", room: "Second Bedroom", quality: 8.7, status: "good" },
+  { id: "p8", url: "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=800&q=80", room: "Pool & Backyard", quality: 9.3, status: "good" },
+];
 
 // ─── CONSTANTS ───
 const VIBES: Vibe[] = [
-  { id: "luxury", name: "Luxury", emoji: "✨", description: "Slow pans, golden tones, orchestral strings", color: "#B8860B", musicLabel: "Cinematic Orchestra" },
-  { id: "modern", name: "Modern", emoji: "🏙️", description: "Clean cuts, cool tones, electronic ambient", color: "#0064E5", musicLabel: "Electronic Ambient" },
-  { id: "warm", name: "Warm & Inviting", emoji: "🏡", description: "Gentle motion, warm light, acoustic guitar", color: "#D4760A", musicLabel: "Acoustic Warmth" },
-  { id: "coastal", name: "Coastal", emoji: "🌊", description: "Airy drift, bright tones, ambient waves", color: "#0088CC", musicLabel: "Ocean Breeze" },
-  { id: "urban", name: "Urban Loft", emoji: "🏢", description: "Dynamic angles, deep bass, industrial chic", color: "#6B4C9A", musicLabel: "Deep Urban" },
-  { id: "classic", name: "Classic Elegance", emoji: "🎻", description: "Timeless pacing, rich tones, piano melody", color: "#2E7D32", musicLabel: "Piano Sonata" },
+  { id: "luxury", name: "Luxury", emoji: "✨", description: "Slow pans, golden tones, orchestral strings", color: "#B8860B", musicLabel: "Cinematic Orchestra", thumbnail: "https://images.unsplash.com/photo-1600607687644-aac4c3eac7f4?w=200&q=60" },
+  { id: "modern", name: "Modern", emoji: "🏙️", description: "Clean cuts, cool tones, electronic ambient", color: "#0064E5", musicLabel: "Electronic Ambient", thumbnail: "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=200&q=60" },
+  { id: "warm", name: "Warm & Inviting", emoji: "🏡", description: "Gentle motion, warm light, acoustic guitar", color: "#D4760A", musicLabel: "Acoustic Warmth", thumbnail: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=200&q=60" },
+  { id: "coastal", name: "Coastal", emoji: "🌊", description: "Airy drift, bright tones, ambient waves", color: "#0088CC", musicLabel: "Ocean Breeze", thumbnail: "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=200&q=60" },
+  { id: "urban", name: "Urban Loft", emoji: "🏢", description: "Dynamic angles, deep bass, industrial chic", color: "#6B4C9A", musicLabel: "Deep Urban", thumbnail: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=200&q=60" },
+  { id: "classic", name: "Classic Elegance", emoji: "🎻", description: "Timeless pacing, rich tones, piano melody", color: "#2E7D32", musicLabel: "Piano Sonata", thumbnail: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=200&q=60" },
 ];
-
-const ROOMS = ["Front Exterior", "Entryway", "Living Room", "Kitchen", "Dining Room", "Primary Bedroom", "Bathroom", "Backyard", "Pool", "Garage"];
 
 const PROCESSING_STEPS = [
-  { label: "Analyzing image quality", icon: "🔍", duration: 1500 },
-  { label: "Classifying rooms", icon: "🏠", duration: 1200 },
-  { label: "Generating depth maps", icon: "📐", duration: 2000 },
-  { label: "Creating parallax motion", icon: "🎬", duration: 2500 },
-  { label: "Sequencing narrative flow", icon: "📖", duration: 1000 },
-  { label: "Matching music to vibe", icon: "🎵", duration: 800 },
-  { label: "Compositing video", icon: "🎞️", duration: 2000 },
-  { label: "Applying brand template", icon: "🎨", duration: 1000 },
-  { label: "Final quality check", icon: "✅", duration: 1000 },
+  { label: "Analyzing image composition & quality", icon: "🔍", duration: 1800 },
+  { label: "Classifying rooms with vision AI", icon: "🏠", duration: 1400 },
+  { label: "Generating depth maps for parallax", icon: "📐", duration: 2200 },
+  { label: "Creating Ken Burns motion paths", icon: "🎬", duration: 2800 },
+  { label: "Sequencing narrative flow", icon: "📖", duration: 1200 },
+  { label: "Matching music to vibe profile", icon: "🎵", duration: 900 },
+  { label: "Compositing HD video frames", icon: "🎞️", duration: 2400 },
+  { label: "Applying Compass brand template", icon: "🎨", duration: 1100 },
+  { label: "Running final quality check", icon: "✅", duration: 1200 },
 ];
+
+// ─── ANIMATED NUMBER ───
+function AnimatedNumber({ value, delay = 0 }: { value: number; delay?: number }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const duration = 1200;
+      const start = Date.now();
+      const interval = setInterval(() => {
+        const elapsed = Date.now() - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setDisplay(Math.round(eased * value * 10) / 10);
+        if (progress >= 1) clearInterval(interval);
+      }, 30);
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [value, delay]);
+  return <>{display.toFixed(1)}</>;
+}
 
 // ─── STEP INDICATOR ───
 function StepIndicator({ current, steps }: { current: number; steps: string[] }) {
@@ -67,9 +128,9 @@ function StepIndicator({ current, steps }: { current: number; steps: string[] })
     <div className="flex items-center justify-center gap-2 mb-10">
       {steps.map((label, i) => (
         <div key={i} className="flex items-center gap-2">
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-500 ${
             i === current
-              ? "bg-[#0064E5] text-white"
+              ? "bg-[#0064E5] text-white scale-105"
               : i < current
               ? "bg-[#0064E5]/10 text-[#0064E5]"
               : "bg-gray-100 text-gray-400"
@@ -78,7 +139,7 @@ function StepIndicator({ current, steps }: { current: number; steps: string[] })
             <span className="hidden sm:inline">{label}</span>
           </div>
           {i < steps.length - 1 && (
-            <ChevronRight size={14} className={i < current ? "text-[#0064E5]/40" : "text-gray-200"} />
+            <ChevronRight size={14} className={`transition-colors duration-300 ${i < current ? "text-[#0064E5]/40" : "text-gray-200"}`} />
           )}
         </div>
       ))}
@@ -100,41 +161,41 @@ function Header() {
           <Zap size={12} className="text-[#0064E5]" />
           <span>AI-Powered</span>
           <span className="text-gray-200">|</span>
-          <span>POC v0.1</span>
+          <span>POC v0.2</span>
         </div>
       </div>
     </header>
   );
 }
 
-// ─── STEP 1: UPLOAD ───
+// ─── STEP 1: UPLOAD (with pre-loaded demo) ───
 function UploadStep({ images, setImages, onNext }: {
-  images: UploadedImage[];
-  setImages: (imgs: UploadedImage[]) => void;
+  images: ListingPhoto[];
+  setImages: (imgs: ListingPhoto[]) => void;
   onNext: () => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [analyzingIdx, setAnalyzingIdx] = useState(-1);
 
-  const handleFiles = useCallback((files: FileList | null) => {
-    if (!files) return;
-    const newImages: UploadedImage[] = Array.from(files).map((file, i) => {
-      const quality = Math.random() * 5 + 5;
-      const roomIdx = (images.length + i) % ROOMS.length;
-      return {
-        id: `img-${Date.now()}-${i}`,
-        file,
-        url: URL.createObjectURL(file),
-        name: file.name,
-        room: ROOMS[roomIdx],
-        quality: Math.round(quality * 10) / 10,
-        status: quality > 7 ? "good" : quality > 5 ? "warning" : "bad",
-      };
+  const loadDemoPhotos = () => {
+    setLoading(true);
+    setAnalyzingIdx(0);
+
+    // Simulate photos loading one by one
+    DEMO_PHOTOS.forEach((photo, i) => {
+      setTimeout(() => {
+        setImages(DEMO_PHOTOS.slice(0, i + 1));
+        setAnalyzingIdx(i);
+        if (i === DEMO_PHOTOS.length - 1) {
+          setTimeout(() => {
+            setLoading(false);
+            setLoaded(true);
+            setAnalyzingIdx(-1);
+          }, 600);
+        }
+      }, i * 350);
     });
-    setImages([...images, ...newImages]);
-  }, [images, setImages]);
-
-  const removeImage = (id: string) => {
-    setImages(images.filter((img) => img.id !== id));
   };
 
   return (
@@ -144,74 +205,109 @@ function UploadStep({ images, setImages, onNext }: {
         <p className="text-gray-500 text-sm">Upload 6–12 photos. AI will score quality and classify each room.</p>
       </div>
 
-      {/* Drop zone */}
-      <div
-        className="border-2 border-dashed border-gray-200 rounded-xl p-10 text-center mb-6 cursor-pointer hover:border-[#0064E5]/40 hover:bg-blue-50/30 transition-all"
-        onClick={() => inputRef.current?.click()}
-        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleFiles(e.dataTransfer.files); }}
-      >
-        <Upload size={32} className="mx-auto mb-3 text-[#0064E5]" />
-        <p className="text-sm text-gray-600 mb-1">Drag & drop photos here, or click to browse</p>
-        <p className="text-xs text-gray-400">JPG, PNG, HEIC — max 20MB per image</p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-      </div>
-
-      {/* Image grid */}
-      {images.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
-          {images.map((img) => (
-            <div key={img.id} className="relative group bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-              <img src={img.url} alt={img.room} className="w-full h-32 object-cover" />
-              <button
-                onClick={() => removeImage(img.id)}
-                className="absolute top-1.5 right-1.5 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+      {/* Drop zone / Demo loader */}
+      {images.length === 0 && !loading ? (
+        <div className="border-2 border-dashed border-gray-200 rounded-xl p-10 text-center mb-6">
+          <Upload size={32} className="mx-auto mb-3 text-[#0064E5]" />
+          <p className="text-sm text-gray-600 mb-1">Drag & drop photos here, or click to browse</p>
+          <p className="text-xs text-gray-400 mb-6">JPG, PNG, HEIC — max 20MB per image</p>
+          <button
+            onClick={loadDemoPhotos}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0064E5] text-white rounded-lg text-sm font-medium hover:bg-[#0049A8] transition-colors shadow-sm"
+          >
+            <Zap size={14} />
+            Load Demo Listing — {LISTING.address}
+          </button>
+          <div className="mt-3 inline-flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
+            <img src={AGENT.photo} alt={AGENT.name} className="w-8 h-8 rounded-full object-cover" />
+            <div className="text-left">
+              <div className="text-xs font-medium text-gray-700">{AGENT.name} · {AGENT.team}</div>
+              <div className="text-[10px] text-gray-400">{LISTING.address}, {LISTING.city}, {LISTING.state} · MLS #{LISTING.mls}</div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Image grid with staggered load animation */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            {images.map((img, i) => (
+              <div
+                key={img.id}
+                className="relative group bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm animate-in"
+                style={{
+                  animation: `fadeSlideIn 0.4s ease-out ${i * 0.08}s both`,
+                }}
               >
-                <X size={10} className="text-white" />
-              </button>
-              <div className="p-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium text-gray-700 truncate">{img.room}</span>
-                  <span className={`text-xs font-bold flex items-center gap-0.5 ${
-                    img.status === "good" ? "text-green-600" :
-                    img.status === "warning" ? "text-amber-500" : "text-red-500"
-                  }`}>
-                    <Star size={10} fill="currentColor" />
-                    {img.quality}
-                  </span>
+                <div className="relative">
+                  <img src={img.url} alt={img.room} className="w-full h-36 object-cover" />
+                  {analyzingIdx === i && loading && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5">
+                        <div className="w-3 h-3 border-2 border-[#0064E5] border-t-transparent rounded-full animate-spin" />
+                        <span className="text-[10px] font-medium text-gray-700">Analyzing...</span>
+                      </div>
+                    </div>
+                  )}
+                  {analyzingIdx > i || !loading ? (
+                    <div className="absolute top-2 right-2">
+                      <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold backdrop-blur-sm ${
+                        img.status === "good" ? "bg-green-500/90 text-white" : "bg-amber-500/90 text-white"
+                      }`}>
+                        <Star size={8} fill="currentColor" />
+                        {img.quality}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
-                {img.status === "bad" && (
-                  <div className="text-[10px] text-red-500 flex items-center gap-1">
-                    <AlertTriangle size={9} />
-                    Low quality — retake suggested
+                <div className="p-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-700">{img.room}</span>
+                    {img.status === "good" && (analyzingIdx > i || !loading) && (
+                      <CheckCircle size={12} className="text-green-500" />
+                    )}
+                    {img.status === "warning" && (analyzingIdx > i || !loading) && (
+                      <AlertTriangle size={12} className="text-amber-500" />
+                    )}
                   </div>
-                )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Analysis summary */}
+          {loaded && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center gap-4"
+              style={{ animation: "fadeSlideIn 0.4s ease-out" }}
+            >
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                <CheckCircle size={20} className="text-green-600" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-green-800">All 8 photos analyzed</div>
+                <div className="text-xs text-green-600">Average quality: 8.9/10 — Excellent. All rooms classified. Ready for video generation.</div>
+              </div>
+              <div className="ml-auto text-right flex-shrink-0">
+                <div className="text-2xl font-bold text-green-700">8.9</div>
+                <div className="text-[9px] text-green-500 uppercase tracking-wider">Avg Score</div>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {/* MLS sync hint */}
       <div className="flex items-center gap-2 text-xs text-gray-400 mb-6">
-        <div className="w-2 h-2 rounded-full bg-green-500" />
+        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
         Connected to MLS — photos auto-sync when listing is published
       </div>
 
       {/* Next */}
       <div className="flex justify-end">
         <button
-          disabled={images.length < 3}
+          disabled={images.length < 3 || loading}
           onClick={onNext}
           className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium text-sm transition-all ${
-            images.length >= 3
+            images.length >= 3 && !loading
               ? "bg-[#0064E5] text-white hover:bg-[#0049A8] shadow-sm"
               : "bg-gray-100 text-gray-400 cursor-not-allowed"
           }`}
@@ -231,43 +327,90 @@ function VibeStep({ selectedVibe, setSelectedVibe, onNext, onBack, suggestedVibe
   onBack: () => void;
   suggestedVibe: string;
 }) {
+  const [previewVibe, setPreviewVibe] = useState<string | null>(null);
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Select Your Vibe</h2>
         <p className="text-gray-500 text-sm">
-          AI suggests: <span className="text-[#0064E5] font-medium">{VIBES.find(v => v.id === suggestedVibe)?.name} {VIBES.find(v => v.id === suggestedVibe)?.emoji}</span>
-          <span className="text-gray-400 ml-1">based on property type & price tier</span>
+          AI analyzed your photos and suggests: <span className="text-[#0064E5] font-medium">{VIBES.find(v => v.id === suggestedVibe)?.name} {VIBES.find(v => v.id === suggestedVibe)?.emoji}</span>
+          <span className="text-gray-400 ml-1">— best match for luxury properties</span>
         </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
-        {VIBES.map((vibe) => (
+        {VIBES.map((vibe, i) => (
           <button
             key={vibe.id}
             onClick={() => setSelectedVibe(vibe.id)}
-            className={`relative p-5 rounded-xl text-left transition-all duration-200 border ${
+            onMouseEnter={() => setPreviewVibe(vibe.id)}
+            onMouseLeave={() => setPreviewVibe(null)}
+            className={`relative p-5 rounded-xl text-left transition-all duration-200 border overflow-hidden ${
               selectedVibe === vibe.id
-                ? "bg-white border-2 shadow-md"
+                ? "border-2 shadow-lg ring-1 ring-opacity-20"
                 : "bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm"
             }`}
-            style={{ borderColor: selectedVibe === vibe.id ? vibe.color : undefined }}
+            style={{
+              borderColor: selectedVibe === vibe.id ? vibe.color : undefined,
+              // @ts-ignore — Tailwind ring color via CSS variable
+              '--tw-ring-color': selectedVibe === vibe.id ? vibe.color : undefined,
+              animation: `fadeSlideIn 0.3s ease-out ${i * 0.06}s both`,
+            } as React.CSSProperties}
           >
-            {vibe.id === suggestedVibe && (
-              <div className="absolute -top-2 -right-2 bg-[#0064E5] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                AI Pick
+            {/* Thumbnail preview */}
+            <div className="absolute inset-0 opacity-[0.04]">
+              <img src={vibe.thumbnail} alt="" className="w-full h-full object-cover" />
+            </div>
+            <div className="relative">
+              {vibe.id === suggestedVibe && (
+                <div className="absolute -top-2 -right-2 bg-[#0064E5] text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Zap size={8} /> AI Pick
+                </div>
+              )}
+              {selectedVibe === vibe.id && (
+                <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: vibe.color }}>
+                  <CheckCircle size={12} className="text-white" />
+                </div>
+              )}
+              <div className="text-2xl mb-2">{vibe.emoji}</div>
+              <div className="font-semibold text-sm text-gray-900 mb-1">{vibe.name}</div>
+              <div className="text-[11px] text-gray-500 leading-relaxed">{vibe.description}</div>
+              <div className="mt-3 flex items-center gap-1.5 text-[10px] text-gray-400">
+                <Music size={10} />
+                {vibe.musicLabel}
               </div>
-            )}
-            <div className="text-2xl mb-2">{vibe.emoji}</div>
-            <div className="font-semibold text-sm text-gray-900 mb-1">{vibe.name}</div>
-            <div className="text-[11px] text-gray-500 leading-relaxed">{vibe.description}</div>
-            <div className="mt-3 flex items-center gap-1.5 text-[10px] text-gray-400">
-              <Music size={10} />
-              {vibe.musicLabel}
             </div>
           </button>
         ))}
       </div>
+
+      {/* Vibe preview strip */}
+      {(selectedVibe || previewVibe) && (
+        <div className="mb-8 bg-gray-50 border border-gray-200 rounded-xl p-4"
+          style={{ animation: "fadeSlideIn 0.3s ease-out" }}
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <Eye size={14} className="text-gray-400" />
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Preview — {VIBES.find(v => v.id === (previewVibe || selectedVibe))?.name}</span>
+          </div>
+          <div className="flex gap-2 overflow-hidden rounded-lg">
+            {DEMO_PHOTOS.slice(0, 4).map((photo, i) => (
+              <div key={photo.id} className="flex-1 h-20 rounded-md overflow-hidden relative">
+                <img src={photo.url} alt={photo.room} className={`w-full h-full object-cover ${
+                  (previewVibe || selectedVibe) === "luxury" ? "saturate-[1.1] brightness-[1.05]" :
+                  (previewVibe || selectedVibe) === "modern" ? "saturate-[0.8] contrast-[1.1]" :
+                  (previewVibe || selectedVibe) === "warm" ? "saturate-[1.3] sepia-[0.15]" :
+                  (previewVibe || selectedVibe) === "coastal" ? "brightness-[1.1] saturate-[1.1]" :
+                  (previewVibe || selectedVibe) === "urban" ? "contrast-[1.15] brightness-[0.95]" :
+                  "saturate-[0.9] brightness-[1.02]"
+                } transition-all duration-500`} />
+                <div className="absolute bottom-1 left-1 text-[8px] text-white font-medium bg-black/40 backdrop-blur-sm px-1 rounded">{photo.room}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-between">
         <button onClick={onBack} className="px-4 py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors">
@@ -290,14 +433,23 @@ function VibeStep({ selectedVibe, setSelectedVibe, onNext, onBack, suggestedVibe
   );
 }
 
-// ─── STEP 3: PROCESSING ───
-function ProcessingStep({ onComplete }: { onComplete: () => void }) {
+// ─── STEP 3: PROCESSING (enhanced) ───
+function ProcessingStep({ onComplete, images }: { onComplete: () => void; images: ListingPhoto[] }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [currentPhoto, setCurrentPhoto] = useState(0);
+
+  useEffect(() => {
+    // Rotate preview photos
+    const photoInterval = setInterval(() => {
+      setCurrentPhoto(p => (p + 1) % images.length);
+    }, 2000);
+    return () => clearInterval(photoInterval);
+  }, [images.length]);
 
   useEffect(() => {
     if (currentStep >= PROCESSING_STEPS.length) {
-      setTimeout(onComplete, 500);
+      setTimeout(onComplete, 800);
       return;
     }
     const step = PROCESSING_STEPS[currentStep];
@@ -309,42 +461,87 @@ function ProcessingStep({ onComplete }: { onComplete: () => void }) {
   }, [currentStep, onComplete]);
 
   return (
-    <div className="max-w-lg mx-auto text-center">
-      <div className="w-24 h-24 rounded-full bg-blue-50 pulse-glow flex items-center justify-center mx-auto mb-8">
-        <Sparkles size={36} className="text-[#0064E5]" />
+    <div className="max-w-2xl mx-auto">
+      {/* Processing hero */}
+      <div className="text-center mb-8">
+        <div className="relative w-32 h-32 mx-auto mb-6">
+          {/* Rotating photo preview */}
+          <div className="w-full h-full rounded-2xl overflow-hidden shadow-lg">
+            {images.map((img, i) => (
+              <img
+                key={img.id}
+                src={img.url}
+                alt={img.room}
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
+                  i === currentPhoto ? "opacity-100" : "opacity-0"
+                }`}
+              />
+            ))}
+          </div>
+          {/* Scanning overlay */}
+          <div className="absolute inset-0 rounded-2xl overflow-hidden">
+            <div className="scan-line" />
+          </div>
+          {/* Pulsing ring */}
+          <div className="absolute -inset-2 rounded-2xl border-2 border-[#0064E5]/30 pulse-glow" />
+          {/* AI badge */}
+          <div className="absolute -bottom-2 -right-2 bg-[#0064E5] text-white rounded-full p-2 shadow-lg">
+            <Sparkles size={16} />
+          </div>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Generating Your Video</h2>
+        <p className="text-gray-400 text-sm">AI is analyzing {images.length} photos and creating cinematic motion</p>
       </div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Generating Your Video</h2>
-      <p className="text-gray-400 text-sm mb-8">This takes about 3–5 minutes in production</p>
 
-      {/* Progress bar */}
-      <div className="w-full h-1.5 bg-gray-100 rounded-full mb-8 overflow-hidden">
+      {/* Big progress bar */}
+      <div className="mb-2 flex items-center justify-between text-xs text-gray-400">
+        <span>{currentStep < PROCESSING_STEPS.length ? PROCESSING_STEPS[currentStep]?.label : "Complete!"}</span>
+        <span className="font-mono">{Math.round(progress)}%</span>
+      </div>
+      <div className="w-full h-2 bg-gray-100 rounded-full mb-8 overflow-hidden">
         <div
-          className="h-full bg-[#0064E5] rounded-full transition-all duration-500 ease-out"
+          className="h-full bg-gradient-to-r from-[#0064E5] to-[#0088CC] rounded-full transition-all duration-700 ease-out relative"
           style={{ width: `${progress}%` }}
-        />
+        >
+          <div className="absolute inset-0 shimmer-bar" />
+        </div>
       </div>
 
-      {/* Steps */}
-      <div className="space-y-2">
+      {/* Steps list */}
+      <div className="space-y-1.5">
         {PROCESSING_STEPS.map((step, i) => (
-          <div key={i} className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-300 ${
-            i === currentStep ? "bg-blue-50 shimmer" :
-            i < currentStep ? "opacity-40" : "opacity-20"
-          }`}>
-            <span className="text-base">{step.icon}</span>
-            <span className="text-sm text-gray-700">{step.label}</span>
-            {i < currentStep && <CheckCircle size={14} className="ml-auto text-green-500" />}
-            {i === currentStep && <Clock size={14} className="ml-auto text-[#0064E5] animate-spin" />}
+          <div
+            key={i}
+            className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-500 ${
+              i === currentStep ? "bg-blue-50 shadow-sm" :
+              i < currentStep ? "opacity-50" : "opacity-20"
+            }`}
+          >
+            <span className="text-base w-6 text-center">{step.icon}</span>
+            <span className={`text-sm flex-1 ${i === currentStep ? "text-gray-900 font-medium" : "text-gray-600"}`}>
+              {step.label}
+            </span>
+            {i < currentStep && <CheckCircle size={14} className="text-green-500" />}
+            {i === currentStep && (
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 border-2 border-[#0064E5] border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
           </div>
         ))}
+      </div>
+
+      {/* ETA */}
+      <div className="text-center mt-6">
+        <p className="text-[10px] text-gray-300">In production this takes 3–5 minutes. Demo is accelerated.</p>
       </div>
     </div>
   );
 }
 
-// ─── STEP 4: PREVIEW ───
+// ─── STEP 4: PREVIEW (cinematic video player) ───
 function PreviewStep({ images, vibe, onNext, onBack }: {
-  images: UploadedImage[];
+  images: ListingPhoto[];
   vibe: Vibe;
   onNext: () => void;
   onBack: () => void;
@@ -352,32 +549,49 @@ function PreviewStep({ images, vibe, onNext, onBack }: {
   const [playing, setPlaying] = useState(false);
   const [currentClip, setCurrentClip] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const totalDuration = images.length * 4;
+  const [showControls, setShowControls] = useState(true);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clipDuration = 5; // seconds per clip
+  const totalDuration = images.length * clipDuration;
+  const [transitionClass, setTransitionClass] = useState("");
 
-  const sortedImages = [...images].sort((a, b) => {
-    const order = ROOMS;
-    return order.indexOf(a.room) - order.indexOf(b.room);
-  });
+  // Auto-hide controls
+  useEffect(() => {
+    if (playing) {
+      controlsTimerRef.current = setTimeout(() => setShowControls(false), 2000);
+    } else {
+      setShowControls(true);
+    }
+    return () => { if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current); };
+  }, [playing, currentClip]);
 
   useEffect(() => {
     if (playing) {
       timerRef.current = setInterval(() => {
         setElapsed((e) => {
-          const next = e + 0.1;
+          const next = e + 0.05;
           if (next >= totalDuration) {
             setPlaying(false);
             return 0;
           }
-          setCurrentClip(Math.floor(next / 4) % sortedImages.length);
+          const newClip = Math.floor(next / clipDuration) % images.length;
+          if (newClip !== Math.floor(e / clipDuration) % images.length) {
+            // Trigger crossfade transition
+            setTransitionClass("crossfade-out");
+            setTimeout(() => {
+              setCurrentClip(newClip);
+              setTransitionClass("crossfade-in");
+            }, 300);
+          }
           return next;
         });
-      }, 100);
+      }, 50);
     } else if (timerRef.current) {
       clearInterval(timerRef.current);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [playing, totalDuration, sortedImages.length]);
+  }, [playing, totalDuration, images.length, clipDuration]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
@@ -385,74 +599,127 @@ function PreviewStep({ images, vibe, onNext, onBack }: {
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
+  const jumpTo = (clipIdx: number) => {
+    setCurrentClip(clipIdx);
+    setElapsed(clipIdx * clipDuration);
+    setTransitionClass("crossfade-in");
+  };
+
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto" style={{ animation: "fadeSlideIn 0.4s ease-out" }}>
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Preview & Edit</h2>
-        <p className="text-gray-500 text-sm">Your video is ready. Swap shots, change music, or adjust the sequence.</p>
+        <p className="text-gray-500 text-sm">Your cinematic listing video is ready. Play it, tweak it, then share.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Video player */}
         <div className="lg:col-span-2">
-          <div className="bg-black rounded-xl overflow-hidden relative aspect-video shadow-lg">
-            {sortedImages[currentClip] && (
+          <div
+            className="bg-black rounded-xl overflow-hidden relative aspect-video shadow-xl cursor-pointer group"
+            onClick={() => setPlaying(!playing)}
+            onMouseMove={() => { setShowControls(true); if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current); controlsTimerRef.current = setTimeout(() => { if (playing) setShowControls(false); }, 2000); }}
+          >
+            {/* All images stacked for crossfade */}
+            {images.map((img, i) => (
               <img
-                src={sortedImages[currentClip].url}
-                alt="Video frame"
-                className={`w-full h-full object-cover ${playing ? `parallax-${currentClip % 4}` : ""}`}
+                key={img.id}
+                src={img.url}
+                alt={img.room}
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                  i === currentClip ? `opacity-100 ${playing ? `parallax-${i % 4}` : ""}` : "opacity-0"
+                } ${i === currentClip ? transitionClass : ""}`}
               />
-            )}
+            ))}
 
-            {/* Brand overlay */}
-            <div className="absolute top-4 left-4">
+            {/* Vignette overlay */}
+            <div className="absolute inset-0 vignette-overlay pointer-events-none" />
+
+            {/* Brand overlay - top */}
+            <div className={`absolute top-4 left-4 transition-opacity duration-300 ${showControls || !playing ? "opacity-100" : "opacity-60"}`}>
               <CompassLogo className="h-3 w-auto" color="#FFFFFF" />
             </div>
-            <div className="absolute bottom-12 left-4 right-4">
-              <div className="text-lg font-bold text-white drop-shadow-lg">4521 Oceanview Drive</div>
-              <div className="text-sm text-white/80 drop-shadow">$2,450,000 · 4 BD · 3 BA · 3,200 SF</div>
+
+            {/* Listing info overlay - bottom */}
+            <div className={`absolute bottom-14 left-4 right-4 transition-opacity duration-500 ${showControls || !playing ? "opacity-100" : "opacity-80"}`}>
+              <div className="text-xl font-bold text-white drop-shadow-lg tracking-tight">{LISTING.address}</div>
+              <div className="text-sm text-white/80 drop-shadow flex items-center gap-2 mt-0.5">
+                {LISTING.price} <span className="text-white/40">·</span> {LISTING.beds} BD <span className="text-white/40">·</span> {LISTING.baths} BA <span className="text-white/40">·</span> {LISTING.sqft} SF
+              </div>
             </div>
 
-            {/* Play button */}
-            {!playing && (
-              <button
-                onClick={() => setPlaying(true)}
-                className="absolute inset-0 flex items-center justify-center"
-              >
-                <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors">
-                  <Play size={28} fill="white" className="text-white ml-1" />
-                </div>
-              </button>
+            {/* Room label */}
+            {playing && (
+              <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-1 rounded-full">
+                {images[currentClip]?.room}
+              </div>
             )}
 
-            {/* Progress bar */}
-            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/60 to-transparent flex items-end px-3 pb-1.5">
-              <div className="flex-1 h-1 bg-white/20 rounded-full mr-2 cursor-pointer" onClick={() => setPlaying(!playing)}>
-                <div className="h-full bg-[#0064E5] rounded-full transition-all" style={{ width: `${(elapsed / totalDuration) * 100}%` }} />
-              </div>
-              <span className="text-[10px] text-white/60">{formatTime(elapsed)} / {formatTime(totalDuration)}</span>
+            {/* Play/Pause button */}
+            <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${
+              !playing || showControls ? "opacity-100" : "opacity-0"
+            }`}>
+              {!playing ? (
+                <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white/30 transition-all hover:scale-110 shadow-2xl">
+                  <Play size={28} fill="white" className="text-white ml-1" />
+                </div>
+              ) : showControls ? (
+                <div className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Pause size={20} fill="white" className="text-white" />
+                </div>
+              ) : null}
             </div>
+
+            {/* Progress bar */}
+            <div className={`absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-black/80 to-transparent flex items-end px-3 pb-2.5 transition-opacity duration-300 ${showControls || !playing ? "opacity-100" : "opacity-0"}`}>
+              <div className="flex-1 h-1 bg-white/20 rounded-full mr-3 cursor-pointer relative" onClick={(e) => { e.stopPropagation(); const rect = e.currentTarget.getBoundingClientRect(); const pct = (e.clientX - rect.left) / rect.width; setElapsed(pct * totalDuration); setCurrentClip(Math.floor(pct * images.length)); }}>
+                <div className="h-full bg-[#0064E5] rounded-full transition-all duration-100" style={{ width: `${(elapsed / totalDuration) * 100}%` }} />
+                {/* Clip markers */}
+                {images.map((_, i) => i > 0 && (
+                  <div key={i} className="absolute top-1/2 -translate-y-1/2 w-0.5 h-2.5 bg-white/30" style={{ left: `${(i / images.length) * 100}%` }} />
+                ))}
+              </div>
+              <span className="text-[10px] text-white/70 font-mono tabular-nums">{formatTime(elapsed)} / {formatTime(totalDuration)}</span>
+            </div>
+
+            {/* Music indicator */}
+            {playing && (
+              <div className="absolute bottom-12 right-3 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
+                <Music size={9} className="text-white/60" />
+                <div className="flex items-end gap-[2px]">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="w-[2px] bg-white/60 rounded-full music-bar" style={{ animationDelay: `${i * 0.15}s` }} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Timeline */}
           <div className="mt-3">
-            <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1.5">Timeline</div>
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-[10px] text-gray-400 uppercase tracking-wider">Timeline</div>
+              <div className="text-[10px] text-gray-300">{images.length} clips · {formatTime(totalDuration)} total</div>
+            </div>
             <div className="flex gap-1">
-              {sortedImages.map((img, i) => {
-                const colors = ["#6B4C9A", "#2E7D32", "#D4760A", "#C62828", "#0064E5", "#0088CC", "#AD1457", "#E65100"];
-                return (
-                  <button
-                    key={img.id}
-                    onClick={() => { setCurrentClip(i); setElapsed(i * 4); }}
-                    className={`timeline-clip flex-1 h-10 rounded-md flex items-center justify-center text-[9px] font-medium text-white ${
-                      i === currentClip ? "ring-2 ring-gray-900" : ""
-                    }`}
-                    style={{ backgroundColor: colors[i % colors.length] }}
-                  >
-                    {img.room.split(" ").pop()}
-                  </button>
-                );
-              })}
+              {images.map((img, i) => (
+                <button
+                  key={img.id}
+                  onClick={() => jumpTo(i)}
+                  className={`relative flex-1 h-14 rounded-md overflow-hidden transition-all ${
+                    i === currentClip ? "ring-2 ring-[#0064E5] ring-offset-1 scale-[1.02]" : "opacity-70 hover:opacity-100"
+                  }`}
+                >
+                  <img src={img.url} alt={img.room} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <span className="absolute bottom-1 left-1 text-[8px] font-medium text-white">{img.room.split(" ").pop()}</span>
+                  {i === currentClip && playing && (
+                    <div className="absolute top-1 left-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    </div>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -467,6 +734,7 @@ function PreviewStep({ images, vibe, onNext, onBack }: {
                 <div className="mt-1 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                   <span>{vibe.emoji}</span>
                   <span className="text-sm text-gray-700">{vibe.name}</span>
+                  <span className="ml-auto text-[10px] text-[#0064E5] font-medium cursor-pointer hover:underline">Change</span>
                 </div>
               </div>
               <div>
@@ -474,14 +742,34 @@ function PreviewStep({ images, vibe, onNext, onBack }: {
                 <div className="mt-1 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                   <Music size={14} className="text-[#0064E5]" />
                   <span className="text-sm text-gray-700">{vibe.musicLabel}</span>
-                  <button className="ml-auto text-[10px] text-[#0064E5] font-medium">Change</button>
+                  <span className="ml-auto text-[10px] text-[#0064E5] font-medium cursor-pointer hover:underline">Change</span>
                 </div>
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Text Overlay</label>
+                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Listing Info</label>
                 <div className="mt-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                  <div className="text-gray-700">4521 Oceanview Drive</div>
-                  <div className="text-gray-400 text-xs">$2,450,000 · Auto-populated from MLS</div>
+                  <div className="text-gray-700 font-medium">{LISTING.address}</div>
+                  <div className="text-gray-400 text-xs">{LISTING.price} · {LISTING.city}, {LISTING.state} · MLS #{LISTING.mls}</div>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Agent</label>
+                <div className="mt-1 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  <img src={AGENT.photo} alt={AGENT.name} className="w-6 h-6 rounded-full object-cover" />
+                  <div>
+                    <div className="text-xs text-gray-700 font-medium">{AGENT.name}</div>
+                    <div className="text-[9px] text-gray-400">{AGENT.office}</div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400 uppercase tracking-wider">Duration</label>
+                <div className="mt-1 flex items-center gap-3">
+                  {["0:30", "0:45", "1:00", "1:30"].map(d => (
+                    <button key={d} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${d === "0:40" ? "bg-[#0064E5] text-white" : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"}`}>
+                      {d}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -492,11 +780,11 @@ function PreviewStep({ images, vibe, onNext, onBack }: {
             <div className="grid grid-cols-2 gap-2">
               {[
                 { icon: RotateCcw, label: "Regenerate" },
-                { icon: Music, label: "Music" },
+                { icon: Music, label: "Swap Music" },
                 { icon: Type, label: "Edit Text" },
                 { icon: ImageIcon, label: "Swap Shot" },
               ].map((action, i) => (
-                <button key={i} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-xs text-gray-600 hover:bg-gray-100 transition-colors">
+                <button key={i} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-xs text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition-all">
                   <action.icon size={14} className="text-gray-400" />
                   {action.label}
                 </button>
@@ -507,12 +795,24 @@ function PreviewStep({ images, vibe, onNext, onBack }: {
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Quality Score</h3>
             <div className="flex items-center gap-3">
-              <div className="text-3xl font-bold text-green-600">9.2</div>
+              <div className="text-3xl font-bold text-green-600"><AnimatedNumber value={9.2} /></div>
               <div className="text-xs text-gray-500 leading-relaxed">
                 Excellent quality<br />
                 No artifacts detected<br />
                 Brand compliant ✓
               </div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[
+                { label: "Composition", score: 9.4 },
+                { label: "Motion", score: 9.1 },
+                { label: "Color", score: 9.0 },
+              ].map(item => (
+                <div key={item.label} className="text-center">
+                  <div className="text-sm font-bold text-gray-700">{item.score}</div>
+                  <div className="text-[9px] text-gray-400">{item.label}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -524,7 +824,7 @@ function PreviewStep({ images, vibe, onNext, onBack }: {
         </button>
         <button
           onClick={onNext}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium text-sm bg-[#0064E5] text-white hover:bg-[#0049A8] shadow-sm transition-colors"
+          className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium text-sm bg-[#0064E5] text-white hover:bg-[#0049A8] shadow-sm transition-all hover:shadow-md"
         >
           <CheckCircle size={16} />
           Approve & Share
@@ -534,85 +834,172 @@ function PreviewStep({ images, vibe, onNext, onBack }: {
   );
 }
 
-// ─── STEP 5: SHARE ───
-function ShareStep({ onRestart }: { onRestart: () => void }) {
-  const [copied, setCopied] = useState(false);
+// ─── STEP 5: SHARE (enhanced) ───
+function ShareStep({ images, onRestart }: { images: ListingPhoto[]; onRestart: () => void }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const [published, setPublished] = useState<string[]>([]);
+
+  const copyText = (text: string, label: string) => {
+    navigator.clipboard?.writeText(text);
+    setCopied(label);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  const togglePublish = (name: string) => {
+    setPublished(prev => prev.includes(name) ? prev.filter(p => p !== name) : [...prev, name]);
+  };
 
   const platforms = [
-    { name: "YouTube", icon: "📺", color: "#FF0000" },
-    { name: "Instagram Reels", icon: "📱", color: "#E1306C" },
-    { name: "Facebook", icon: "👍", color: "#4267B2" },
-    { name: "TikTok", icon: "🎵", color: "#000000" },
-    { name: "MLS Attachment", icon: "🏠", color: "#2E7D32" },
-    { name: "Listing Page", icon: "🌐", color: "#0064E5" },
+    { name: "YouTube", icon: "📺", color: "#FF0000", desc: "Full-length HD" },
+    { name: "Instagram Reels", icon: "📱", color: "#E1306C", desc: "Vertical 9:16" },
+    { name: "Facebook", icon: "👍", color: "#4267B2", desc: "Feed + Stories" },
+    { name: "TikTok", icon: "🎵", color: "#000000", desc: "Short-form viral" },
+    { name: "MLS Attachment", icon: "🏠", color: "#2E7D32", desc: "Auto-sync" },
+    { name: "Listing Page", icon: "🌐", color: "#0064E5", desc: "Embedded player" },
   ];
 
   return (
-    <div className="max-w-3xl mx-auto text-center">
-      <div className="w-20 h-20 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-6">
-        <CheckCircle size={40} className="text-green-600" />
+    <div className="max-w-3xl mx-auto" style={{ animation: "fadeSlideIn 0.5s ease-out" }}>
+      {/* Success hero */}
+      <div className="text-center mb-8">
+        <div className="w-20 h-20 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4 relative">
+          <CheckCircle size={40} className="text-green-600" />
+          <div className="absolute -inset-1 rounded-full border-2 border-green-200 animate-ping opacity-30" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Video is Ready!</h2>
+        <p className="text-gray-500 text-sm">Published to your listing. Share across platforms with one click.</p>
       </div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Video is Ready!</h2>
-      <p className="text-gray-500 text-sm mb-8">Published to your listing. Share across platforms with one click.</p>
+
+      {/* Video thumbnail */}
+      <div className="relative rounded-xl overflow-hidden mb-8 shadow-lg aspect-video max-w-lg mx-auto">
+        <img src={images[0]?.url} alt="Video thumbnail" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+        <div className="absolute top-3 left-3">
+          <CompassLogo className="h-2.5 w-auto" color="#FFFFFF" />
+        </div>
+        <div className="absolute bottom-3 left-3">
+          <div className="text-sm font-bold text-white">{LISTING.address}</div>
+          <div className="text-[10px] text-white/70">{LISTING.price} · {LISTING.city}, {LISTING.state}</div>
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+            <Play size={20} fill="white" className="text-white ml-0.5" />
+          </div>
+        </div>
+        <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full">
+          0:40
+        </div>
+      </div>
 
       {/* Stats */}
       <div className="flex justify-center gap-8 mb-8">
-        <div>
-          <div className="text-2xl font-bold text-gray-900">1:28</div>
-          <div className="text-[10px] text-gray-400 uppercase tracking-wider">Duration</div>
-        </div>
-        <div>
-          <div className="text-2xl font-bold text-gray-900">1080p</div>
-          <div className="text-[10px] text-gray-400 uppercase tracking-wider">Resolution</div>
-        </div>
-        <div>
-          <div className="text-2xl font-bold text-green-600">9.2</div>
-          <div className="text-[10px] text-gray-400 uppercase tracking-wider">Quality</div>
-        </div>
-      </div>
-
-      {/* Share grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
-        {platforms.map((p) => (
-          <button
-            key={p.name}
-            className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 hover:shadow-sm transition-all text-left"
-          >
-            <span className="text-xl">{p.icon}</span>
-            <div>
-              <div className="text-sm font-medium text-gray-900">{p.name}</div>
-              <div className="text-[10px] text-gray-400">Auto-format & publish</div>
-            </div>
-            <ExternalLink size={14} className="ml-auto text-gray-300" />
-          </button>
+        {[
+          { value: "0:40", label: "Duration" },
+          { value: "1080p", label: "Resolution" },
+          { value: "9.2", label: "Quality", color: "text-green-600" },
+          { value: "8", label: "Clips" },
+        ].map(stat => (
+          <div key={stat.label} className="text-center">
+            <div className={`text-xl font-bold ${stat.color || "text-gray-900"}`}>{stat.value}</div>
+            <div className="text-[9px] text-gray-400 uppercase tracking-wider">{stat.label}</div>
+          </div>
         ))}
       </div>
 
+      {/* Share grid */}
+      <div className="mb-6">
+        <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Distribute to Platforms</div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {platforms.map((p) => (
+            <button
+              key={p.name}
+              onClick={() => togglePublish(p.name)}
+              className={`flex items-center gap-3 bg-white border rounded-xl p-3.5 transition-all text-left ${
+                published.includes(p.name) ? "border-green-300 bg-green-50/50 shadow-sm" : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+              }`}
+            >
+              <span className="text-xl">{p.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-gray-900">{p.name}</div>
+                <div className="text-[10px] text-gray-400">{p.desc}</div>
+              </div>
+              {published.includes(p.name) ? (
+                <CheckCircle size={16} className="text-green-500 flex-shrink-0" />
+              ) : (
+                <ArrowRight size={14} className="text-gray-300 flex-shrink-0" />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Actions */}
-      <div className="flex justify-center gap-3 mb-6">
-        <button className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+      <div className="flex flex-wrap justify-center gap-3 mb-6">
+        <button className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-all hover:shadow-sm">
           <Download size={16} />
           Download MP4
         </button>
         <button
-          onClick={() => { navigator.clipboard?.writeText("https://compass.com/v/abc123"); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-          className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          onClick={() => copyText("https://compass.com/listing/4521-oceanview-dr/video", "link")}
+          className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-all hover:shadow-sm"
         >
-          <Share2 size={16} />
-          {copied ? "Copied!" : "Copy Link"}
+          {copied === "link" ? <CheckCircle size={16} className="text-green-500" /> : <Copy size={16} />}
+          {copied === "link" ? "Copied!" : "Copy Link"}
         </button>
-        <button className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-          <Camera size={16} />
-          Embed Player
+        <button
+          onClick={() => copyText('<iframe src="https://compass.com/embed/v/abc123" width="640" height="360" frameborder="0"></iframe>', "embed")}
+          className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-all hover:shadow-sm"
+        >
+          {copied === "embed" ? <CheckCircle size={16} className="text-green-500" /> : <Code size={16} />}
+          {copied === "embed" ? "Copied!" : "Embed Code"}
         </button>
       </div>
 
-      <button
-        onClick={onRestart}
-        className="text-sm text-[#0064E5] hover:underline font-medium"
-      >
-        Create another video →
-      </button>
+      {/* Agent card */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 flex items-center gap-4">
+        <img src={AGENT.photo} alt={AGENT.name} className="w-14 h-14 rounded-full object-cover border-2 border-gray-100" />
+        <div className="flex-1">
+          <div className="text-sm font-semibold text-gray-900">{AGENT.name}</div>
+          <div className="text-xs text-gray-500">{AGENT.title}</div>
+          <div className="text-xs text-gray-400">{AGENT.office} · {AGENT.license}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] text-gray-400">{AGENT.phone}</div>
+          <div className="text-[10px] text-[#0064E5]">{AGENT.email}</div>
+          <div className="text-[9px] text-gray-300 mt-1">{AGENT.volume}</div>
+        </div>
+      </div>
+
+      {/* Analytics teaser */}
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Performance (simulated)</div>
+          <span className="text-[9px] text-gray-300">Updates in real-time</span>
+        </div>
+        <div className="grid grid-cols-4 gap-4">
+          {[
+            { label: "Views", value: "2,847", delta: "+12%" },
+            { label: "Avg Watch", value: "0:32", delta: "80%" },
+            { label: "Saves", value: "184", delta: "+8%" },
+            { label: "Inquiries", value: "23", delta: "+15%" },
+          ].map(m => (
+            <div key={m.label} className="text-center">
+              <div className="text-lg font-bold text-gray-900">{m.value}</div>
+              <div className="text-[9px] text-gray-400">{m.label}</div>
+              <div className="text-[9px] text-green-500 font-medium">{m.delta}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="text-center">
+        <button
+          onClick={onRestart}
+          className="text-sm text-[#0064E5] hover:underline font-medium"
+        >
+          Create another video →
+        </button>
+      </div>
     </div>
   );
 }
@@ -620,7 +1007,7 @@ function ShareStep({ onRestart }: { onRestart: () => void }) {
 // ─── MAIN APP ───
 export default function Home() {
   const [step, setStep] = useState(0);
-  const [images, setImages] = useState<UploadedImage[]>([]);
+  const [images, setImages] = useState<ListingPhoto[]>([]);
   const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
 
   const steps = ["Upload", "Vibe", "Generate", "Preview", "Share"];
@@ -648,7 +1035,7 @@ export default function Home() {
             suggestedVibe={suggestedVibe}
           />
         )}
-        {step === 2 && <ProcessingStep onComplete={() => setStep(3)} />}
+        {step === 2 && <ProcessingStep onComplete={() => setStep(3)} images={images} />}
         {step === 3 && (
           <PreviewStep
             images={images}
@@ -657,7 +1044,7 @@ export default function Home() {
             onBack={() => setStep(2)}
           />
         )}
-        {step === 4 && <ShareStep onRestart={restart} />}
+        {step === 4 && <ShareStep images={images} onRestart={restart} />}
       </main>
 
       {/* Footer */}
@@ -667,4 +1054,3 @@ export default function Home() {
     </div>
   );
 }
-
