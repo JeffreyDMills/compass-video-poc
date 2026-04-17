@@ -8,119 +8,103 @@ import {
   ArrowRight, Eye, Volume2, VolumeX
 } from "lucide-react";
 
-// ─── AMBIENT MUSIC ENGINE (Web Audio API) ───
-// Generates vibe-matched ambient soundscapes — no external files needed.
-// Each vibe creates a unique chord pad with slow filter modulation.
-function createMusicEngine() {
-  let ctx: AudioContext | null = null;
-  let masterGain: GainNode | null = null;
-  let nodes: (OscillatorNode | GainNode | BiquadFilterNode)[] = [];
-  let active = false;
+// ─── MUSIC PLAYER (royalty-free tracks from Pixabay) ───
+// Real music files — each vibe gets its own ambient track
+const VIBE_TRACKS: Record<string, string> = {
+  luxury:  "https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3",   // cinematic ambient (111s)
+  modern:  "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",   // electronic chill (147s)
+  warm:    "https://cdn.pixabay.com/audio/2021/11/25/audio_91b32e02f9.mp3",   // gentle ambient (85s)
+  coastal: "https://cdn.pixabay.com/audio/2024/11/04/audio_4956b4edd1.mp3",   // calm ocean ambient (101s)
+  urban:   "https://cdn.pixabay.com/audio/2022/11/22/audio_febc508520.mp3",   // deep moody (144s)
+  classic: "https://cdn.pixabay.com/audio/2022/08/03/audio_54ca0ffa52.mp3",   // piano elegant (134s)
+};
+
+function createMusicPlayer() {
+  let audio: HTMLAudioElement | null = null;
   let currentVibe = "";
+  let active = false;
+  let fadeInterval: ReturnType<typeof setInterval> | null = null;
 
-  function ensureCtx() {
-    if (!ctx) {
-      ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      masterGain = ctx.createGain();
-      masterGain.gain.value = 0;
-      masterGain.connect(ctx.destination);
-    }
-    if (ctx.state === "suspended") ctx.resume();
-    return ctx;
+  function fadeIn(el: HTMLAudioElement, target: number, durationMs: number) {
+    if (fadeInterval) clearInterval(fadeInterval);
+    el.volume = 0;
+    const step = target / (durationMs / 30);
+    fadeInterval = setInterval(() => {
+      if (el.volume + step >= target) {
+        el.volume = target;
+        if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
+      } else {
+        el.volume = Math.min(el.volume + step, 1);
+      }
+    }, 30);
   }
 
-  function addPad(freq: number, type: OscillatorType, vol: number, detune: number) {
-    const c = ensureCtx();
-    const osc = c.createOscillator();
-    const gain = c.createGain();
-    const filter = c.createBiquadFilter();
-    const lfo = c.createOscillator();
-    const lfoGain = c.createGain();
-
-    osc.type = type;
-    osc.frequency.value = freq;
-    osc.detune.value = detune;
-    filter.type = "lowpass";
-    filter.frequency.value = 600 + Math.random() * 400;
-    filter.Q.value = 0.7;
-    gain.gain.value = vol;
-
-    // Slow LFO moves the filter cutoff for organic movement
-    lfo.type = "sine";
-    lfo.frequency.value = 0.03 + Math.random() * 0.08;
-    lfoGain.gain.value = 250 + Math.random() * 150;
-    lfo.connect(lfoGain);
-    lfoGain.connect(filter.frequency);
-
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(masterGain!);
-
-    osc.start();
-    lfo.start();
-
-    nodes.push(osc, gain, filter, lfo, lfoGain);
+  function fadeOut(el: HTMLAudioElement, durationMs: number): Promise<void> {
+    return new Promise(resolve => {
+      if (fadeInterval) clearInterval(fadeInterval);
+      const step = el.volume / (durationMs / 30);
+      fadeInterval = setInterval(() => {
+        if (el.volume - step <= 0) {
+          el.volume = 0;
+          el.pause();
+          if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
+          resolve();
+        } else {
+          el.volume = Math.max(el.volume - step, 0);
+        }
+      }, 30);
+    });
   }
-
-  const VIBES: Record<string, { notes: number[]; type: OscillatorType }> = {
-    luxury:  { notes: [130.81, 196.00, 261.63, 329.63, 392.00], type: "sine" },
-    modern:  { notes: [110.00, 164.81, 220.00, 329.63, 440.00], type: "triangle" },
-    warm:    { notes: [146.83, 220.00, 293.66, 369.99, 440.00], type: "sine" },
-    coastal: { notes: [174.61, 261.63, 349.23, 440.00, 523.25], type: "sine" },
-    urban:   { notes: [98.00, 146.83, 196.00, 293.66, 392.00], type: "sawtooth" },
-    classic: { notes: [130.81, 164.81, 196.00, 261.63, 329.63], type: "sine" },
-  };
 
   return {
     play(vibeId: string) {
-      // Already playing this vibe — do nothing
-      if (active && currentVibe === vibeId) return;
+      if (active && currentVibe === vibeId && audio && !audio.paused) return;
 
-      // Kill existing oscillators immediately
-      nodes.forEach(n => { try { if (n instanceof OscillatorNode) n.stop(); } catch {} });
-      nodes = [];
+      const trackUrl = VIBE_TRACKS[vibeId] || VIBE_TRACKS.luxury;
 
-      const c = ensureCtx();
+      // If same vibe, just resume
+      if (audio && currentVibe === vibeId && audio.paused) {
+        audio.play().then(() => fadeIn(audio!, 0.5, 1000)).catch(() => {});
+        active = true;
+        return;
+      }
+
+      // Different vibe or first play — swap track
+      if (audio) {
+        audio.pause();
+        audio.src = "";
+      }
+
+      audio = new Audio(trackUrl);
+      audio.loop = true;
+      audio.volume = 0;
+      audio.crossOrigin = "anonymous";
       currentVibe = vibeId;
       active = true;
 
-      const config = VIBES[vibeId] || VIBES.luxury;
-      config.notes.forEach((freq, i) => {
-        addPad(freq, config.type, 0.05 - i * 0.007, (Math.random() - 0.5) * 12);
+      audio.play().then(() => {
+        fadeIn(audio!, 0.5, 1500);
+      }).catch((err) => {
+        console.log("Music autoplay blocked — will play on next user interaction", err);
       });
-
-      // Fade in over 1.5s
-      masterGain!.gain.cancelScheduledValues(c.currentTime);
-      masterGain!.gain.setValueAtTime(masterGain!.gain.value, c.currentTime);
-      masterGain!.gain.linearRampToValueAtTime(0.4, c.currentTime + 1.5);
     },
 
     stop() {
-      if (!active || !ctx || !masterGain) return;
+      if (!active || !audio) return;
       active = false;
-      currentVibe = "";
-
-      // Fade out, then kill oscillators
-      masterGain.gain.cancelScheduledValues(ctx.currentTime);
-      masterGain.gain.setValueAtTime(masterGain.gain.value, ctx.currentTime);
-      masterGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
-
-      const oldNodes = [...nodes];
-      nodes = [];
-      setTimeout(() => {
-        oldNodes.forEach(n => { try { if (n instanceof OscillatorNode) n.stop(); } catch {} });
-      }, 500);
+      fadeOut(audio, 400).then(() => {
+        currentVibe = "";
+      });
     },
 
     get playing() { return active; },
   };
 }
 
-// Singleton — created on first use in the browser
-let _engine: ReturnType<typeof createMusicEngine> | null = null;
+let _player: ReturnType<typeof createMusicPlayer> | null = null;
 function getMusicEngine() {
-  if (!_engine && typeof window !== "undefined") _engine = createMusicEngine();
-  return _engine;
+  if (!_player && typeof window !== "undefined") _player = createMusicPlayer();
+  return _player;
 }
 
 // ─── COMPASS LOGO SVG (from compass.com) ───
