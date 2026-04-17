@@ -1,24 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --navy: #0A1628;
-  --navy-light: #111D33;
-  --navy-card: #1A2744;
-  --accent: #6B8AFF;
-  --green: #2ECC71;
-  --orange: #F39C12;
-  --red: #E74C3C;
-  --purple: #9B59B6;
+  --compass-blue: #0064E5;
+  --compass-blue-dark: #0049A8;
+  --compass-black: #000000;
+  --compass-white: #FFFFFF;
+  --compass-gray-50: #F9FAFB;
+  --compass-gray-100: #F3F4F6;
+  --compass-gray-200: #E5E7EB;
+  --compass-gray-400: #9CA3AF;
+  --compass-gray-700: #374151;
+  --compass-gray-900: #111827;
 }
 
 body {
-  background: var(--navy);
-  color: #fff;
+  background: var(--compass-white);
+  color: var(--compass-gray-900);
+  font-family: "Compass Sans", Helvetica, Arial, sans-serif;
 }
 
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--navy); }
-::-webkit-scrollbar-thumb { background: var(--navy-card); border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--compass-gray-50); }
+::-webkit-scrollbar-thumb { background: var(--compass-gray-200); border-radius: 3px; }
 
 @keyframes slowZoomPan {
   0% { transform: scale(1) translate(0, 0); }
@@ -44,8 +47,8 @@ body {
 .parallax-3 { animation: slowPullBack 10s ease-in-out infinite alternate; }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(107,138,255,0.15); }
-  50% { box-shadow: 0 0 40px rgba(107,138,255,0.4); }
+  0%, 100% { box-shadow: 0 0 20px rgba(0,100,229,0.1); }
+  50% { box-shadow: 0 0 40px rgba(0,100,229,0.25); }
 }
 .pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 
@@ -54,7 +57,7 @@ body {
   100% { background-position: 200% 0; }
 }
 .shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(107,138,255,0.1) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(0,100,229,0.06) 50%, transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 2s ease-in-out infinite;
 }
