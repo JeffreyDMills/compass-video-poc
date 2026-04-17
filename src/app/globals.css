@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  --navy: #0A1628;
+  --navy-light: #111D33;
+  --navy-card: #1A2744;
+  --accent: #6B8AFF;
+  --green: #2ECC71;
+  --orange: #F39C12;
+  --red: #E74C3C;
+  --purple: #9B59B6;
+}
+
+body {
+  background: var(--navy);
+  color: #fff;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--navy); }
+::-webkit-scrollbar-thumb { background: var(--navy-card); border-radius: 3px; }
+
+@keyframes slowZoomPan {
+  0% { transform: scale(1) translate(0, 0); }
+  50% { transform: scale(1.15) translate(-2%, -1%); }
+  100% { transform: scale(1.08) translate(1%, -2%); }
+}
+@keyframes slowPanRight {
+  0% { transform: scale(1.1) translate(-3%, 0); }
+  100% { transform: scale(1.1) translate(3%, -1%); }
+}
+@keyframes slowPanUp {
+  0% { transform: scale(1.12) translate(0, 2%); }
+  100% { transform: scale(1.12) translate(-1%, -3%); }
+}
+@keyframes slowPullBack {
+  0% { transform: scale(1.2) translate(1%, 1%); }
+  100% { transform: scale(1.0) translate(0, 0); }
+}
+
+.parallax-0 { animation: slowZoomPan 8s ease-in-out infinite alternate; }
+.parallax-1 { animation: slowPanRight 7s ease-in-out infinite alternate; }
+.parallax-2 { animation: slowPanUp 9s ease-in-out infinite alternate; }
+.parallax-3 { animation: slowPullBack 10s ease-in-out infinite alternate; }
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(107,138,255,0.15); }
+  50% { box-shadow: 0 0 40px rgba(107,138,255,0.4); }
+}
+.pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(107,138,255,0.1) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
