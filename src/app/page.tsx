@@ -5,8 +5,132 @@ import {
   Upload, Sparkles, Play, Pause, Share2, CheckCircle, AlertTriangle,
   ChevronRight, Music, RotateCcw, Type, Image as ImageIcon,
   Download, ExternalLink, X, Camera, Star, Zap, Clock, Copy, Code,
-  ArrowRight, Eye
+  ArrowRight, Eye, Volume2, VolumeX
 } from "lucide-react";
+
+// ─── AMBIENT MUSIC ENGINE (Web Audio API) ───
+// Generates vibe-matched ambient soundscapes using pure Web Audio — no external files needed
+class AmbientMusicEngine {
+  private ctx: AudioContext | null = null;
+  private gainNode: GainNode | null = null;
+  private oscillators: OscillatorNode[] = [];
+  private isPlaying = false;
+  private vibeId: string = "";
+
+  private getCtx(): AudioContext {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      this.gainNode = this.ctx.createGain();
+      this.gainNode.gain.value = 0;
+      this.gainNode.connect(this.ctx.destination);
+    }
+    return this.ctx;
+  }
+
+  private createPad(freq: number, type: OscillatorType, gainVal: number, detuneVal: number = 0) {
+    const ctx = this.getCtx();
+    const osc = ctx.createOscillator();
+    const oscGain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = type;
+    osc.frequency.value = freq;
+    osc.detune.value = detuneVal;
+
+    filter.type = "lowpass";
+    filter.frequency.value = 800;
+    filter.Q.value = 1;
+
+    oscGain.gain.value = gainVal;
+
+    osc.connect(filter);
+    filter.connect(oscGain);
+    oscGain.connect(this.gainNode!);
+    osc.start();
+
+    this.oscillators.push(osc);
+
+    // Slow LFO on filter for movement
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.frequency.value = 0.05 + Math.random() * 0.1;
+    lfoGain.gain.value = 300;
+    lfo.connect(lfoGain);
+    lfoGain.connect(filter.frequency);
+    lfo.start();
+    this.oscillators.push(lfo);
+  }
+
+  play(vibeId: string) {
+    if (this.isPlaying && this.vibeId === vibeId) return;
+    this.stop();
+
+    const ctx = this.getCtx();
+    if (ctx.state === "suspended") ctx.resume();
+
+    this.vibeId = vibeId;
+    this.isPlaying = true;
+
+    // Vibe-specific chord voicings and timbres
+    const vibeConfigs: Record<string, { notes: number[]; type: OscillatorType; filterFreq?: number }> = {
+      luxury:  { notes: [130.81, 196.00, 261.63, 329.63, 392.00], type: "sine" },       // C major spread — warm orchestral
+      modern:  { notes: [110.00, 164.81, 220.00, 329.63, 440.00], type: "triangle" },    // Am9 — cool electronic
+      warm:    { notes: [146.83, 220.00, 293.66, 369.99, 440.00], type: "sine" },         // D major — warm acoustic
+      coastal: { notes: [174.61, 261.63, 349.23, 440.00, 523.25], type: "sine" },         // F major — bright airy
+      urban:   { notes: [98.00, 146.83, 196.00, 293.66, 392.00], type: "sawtooth" },      // G minor — deep moody
+      classic: { notes: [130.81, 164.81, 196.00, 261.63, 329.63], type: "sine" },         // C/E — elegant piano-like
+    };
+
+    const config = vibeConfigs[vibeId] || vibeConfigs.luxury;
+
+    config.notes.forEach((freq, i) => {
+      this.createPad(freq, config.type, 0.06 - i * 0.008, (Math.random() - 0.5) * 15);
+    });
+
+    // Fade in
+    this.gainNode!.gain.setValueAtTime(0, ctx.currentTime);
+    this.gainNode!.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 2);
+  }
+
+  stop() {
+    if (!this.isPlaying) return;
+    this.isPlaying = false;
+
+    if (this.gainNode && this.ctx) {
+      this.gainNode.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.5);
+    }
+
+    setTimeout(() => {
+      this.oscillators.forEach(osc => {
+        try { osc.stop(); } catch {}
+      });
+      this.oscillators = [];
+    }, 600);
+  }
+
+  setVolume(v: number) {
+    if (this.gainNode && this.ctx) {
+      this.gainNode.gain.linearRampToValueAtTime(v, this.ctx.currentTime + 0.1);
+    }
+  }
+
+  get playing() { return this.isPlaying; }
+
+  dispose() {
+    this.stop();
+    if (this.ctx) {
+      this.ctx.close();
+      this.ctx = null;
+    }
+  }
+}
+
+// Singleton music engine
+let musicEngine: AmbientMusicEngine | null = null;
+function getMusicEngine(): AmbientMusicEngine {
+  if (!musicEngine) musicEngine = new AmbientMusicEngine();
+  return musicEngine;
+}
 
 // ─── COMPASS LOGO SVG (from compass.com) ───
 function CompassLogo({ className = "", color = "currentColor" }: { className?: string; color?: string }) {
@@ -547,6 +671,7 @@ function PreviewStep({ images, vibe, onNext, onBack }: {
   onBack: () => void;
 }) {
   const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
   const [currentClip, setCurrentClip] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [showControls, setShowControls] = useState(true);
@@ -555,6 +680,22 @@ function PreviewStep({ images, vibe, onNext, onBack }: {
   const clipDuration = 5; // seconds per clip
   const totalDuration = images.length * clipDuration;
   const [transitionClass, setTransitionClass] = useState("");
+
+  // Music engine integration
+  useEffect(() => {
+    const engine = getMusicEngine();
+    if (playing && !muted) {
+      engine.play(vibe.id);
+    } else {
+      engine.stop();
+    }
+    return () => { engine.stop(); };
+  }, [playing, muted, vibe.id]);
+
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMuted(m => !m);
+  };
 
   // Auto-hide controls
   useEffect(() => {
@@ -682,16 +823,25 @@ function PreviewStep({ images, vibe, onNext, onBack }: {
               <span className="text-[10px] text-white/70 font-mono tabular-nums">{formatTime(elapsed)} / {formatTime(totalDuration)}</span>
             </div>
 
-            {/* Music indicator */}
+            {/* Music control */}
             {playing && (
-              <div className="absolute bottom-12 right-3 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
-                <Music size={9} className="text-white/60" />
-                <div className="flex items-end gap-[2px]">
-                  {[1,2,3,4].map(i => (
-                    <div key={i} className="w-[2px] bg-white/60 rounded-full music-bar" style={{ animationDelay: `${i * 0.15}s` }} />
-                  ))}
-                </div>
-              </div>
+              <button
+                onClick={toggleMute}
+                className="absolute bottom-12 right-3 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1.5 hover:bg-black/60 transition-colors cursor-pointer"
+              >
+                {muted ? (
+                  <VolumeX size={11} className="text-white/60" />
+                ) : (
+                  <>
+                    <Volume2 size={11} className="text-white/80" />
+                    <div className="flex items-end gap-[2px]">
+                      {[1,2,3,4].map(i => (
+                        <div key={i} className="w-[2px] bg-white/70 rounded-full music-bar" style={{ animationDelay: `${i * 0.15}s` }} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </button>
             )}
           </div>
 
